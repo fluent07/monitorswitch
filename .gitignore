@@ -1,2 +1,4 @@
 .current-external
 .last-mode
+.detected-internal
+settings.conf

@@ -1,6 +1,6 @@
 #!/bin/bash
 source "$HOME/.config/hypr/monitors/common.sh"
-
+set_internal_enabled 1
 ensure_runtime_files
 : > "$IGNORE_FILE"
 

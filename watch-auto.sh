@@ -28,10 +28,67 @@ launch_menu() {
 
 restore_laptop() {
     log_msg "restoring laptop"
+    set_last_mode "primary-only"
     set_layout_flag
     bash "$PROFILE_DIR/restore-laptop.sh" >/dev/null 2>>"$LOGFILE"
-    set_last_mode "primary-only"
-    clear_layout_flag_later 3
+    clear_layout_flag_later 5
+}
+
+handle_config_reload() {
+    # If a layout change is already in progress (including one triggered by
+    # a previous configreloaded), ignore this event to prevent a reload loop.
+    if layout_change_active; then
+        log_msg "ignored configreloaded during layout change"
+        return
+    fi
+
+    local last_mode ext_mon
+    last_mode="$(cat "$STATE_FILE" 2>/dev/null)"
+    ext_mon="$(get_current_external)"
+
+    [ -z "$last_mode" ] && return
+
+    log_msg "config reloaded, last mode: $last_mode, external: ${ext_mon:-none}"
+    set_layout_flag
+
+    case "$last_mode" in
+        monitor-only)
+            # External is connected and last mode was external-only:
+            # hyprland.conf just re-enabled the internal — disable it again.
+            if [ -n "$ext_mon" ] && external_monitor_present "$ext_mon"; then
+                log_msg "re-applying monitor-only after reload"
+                bash "$PROFILE_DIR/monitor-only.sh" >/dev/null 2>>"$LOGFILE"
+            else
+                log_msg "external gone, falling back to primary-only after reload"
+                bash "$PROFILE_DIR/primary-only.sh" >/dev/null 2>>"$LOGFILE"
+                set_last_mode "primary-only"
+            fi
+            ;;
+        duplicate)
+            if [ -n "$ext_mon" ] && external_monitor_present "$ext_mon"; then
+                log_msg "re-applying duplicate after reload"
+                bash "$PROFILE_DIR/duplicate.sh" >/dev/null 2>>"$LOGFILE"
+            else
+                bash "$PROFILE_DIR/primary-only.sh" >/dev/null 2>>"$LOGFILE"
+                set_last_mode "primary-only"
+            fi
+            ;;
+        extend)
+            if [ -n "$ext_mon" ] && external_monitor_present "$ext_mon"; then
+                log_msg "re-applying extend after reload"
+                bash "$PROFILE_DIR/extend.sh" >/dev/null 2>>"$LOGFILE"
+            else
+                bash "$PROFILE_DIR/primary-only.sh" >/dev/null 2>>"$LOGFILE"
+                set_last_mode "primary-only"
+            fi
+            ;;
+        primary-only)
+            # hyprland.conf already enabled internal — nothing to fix
+            log_msg "primary-only after reload, no action needed"
+            ;;
+    esac
+
+    clear_layout_flag_later 5
 }
 
 handle_verified_add() {
@@ -123,6 +180,13 @@ socat -U - UNIX-CONNECT:"$SOCKET" | while IFS= read -r line; do
             mon="${line#monitorremoved>>}"
             (
                 handle_verified_remove "$mon"
+            ) >/dev/null 2>>"$LOGFILE" &
+            ;;
+
+        'configreloaded>>'*)
+            (
+                sleep 0.5
+                handle_config_reload
             ) >/dev/null 2>>"$LOGFILE" &
             ;;
     esac

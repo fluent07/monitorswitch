@@ -1,6 +1,6 @@
 #!/bin/bash
 source "$HOME/.config/hypr/monitors/common.sh"
-
+set_internal_enabled 1
 EXT_MON="$(get_current_external)"
 [ -z "$EXT_MON" ] && exit 1
 
