@@ -14,9 +14,11 @@ case "$choice" in
         clear_layout_flag_later 3
         ;;
     "Monitor only")
-        set_last_mode "monitor-only"
         set_layout_flag
         bash "$PROFILE_DIR/monitor-only.sh"
+        if [ $? -eq 0 ]; then
+            set_last_mode "monitor-only"
+        fi
         clear_layout_flag_later 3
         ;;
     "Duplicate")
